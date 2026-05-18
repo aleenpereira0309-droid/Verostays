@@ -1,0 +1,207 @@
+import { Search, MapPin, Calendar, Crosshair } from 'lucide-react';
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { Calendar as CalendarComponent } from '../components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { GuestSelector } from './GuestSelector';
+import { useNavigate } from 'react-router';
+import LoadingScreen from '../components/LoadingScreen'; // Adjust this path if needed!
+
+export function HeroSection() {
+  const navigate = useNavigate();
+  const [destination, setDestination] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [checkIn, setCheckIn] = useState<Date>();
+  const [checkOut, setCheckOut] = useState<Date>();
+  const [rooms, setRooms] = useState(1);
+  const [guests, setGuests] = useState(2);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  // 1. Restored the handleNearbyLocation function that got accidentally cut off
+  const handleNearbyLocation = () => {
+    setIsGettingLocation(true);
+    
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          // Use reverse geocoding to get city name
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
+            .then(res => res.json())
+            .then(data => {
+              const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county;
+              const area = data.address?.suburb || data.address?.neighbourhood;
+              
+              if (city) {
+                const locationText = area ? `${area}, ${city}` : city;
+                setDestination(locationText);
+              } else {
+                setDestination(`Near your location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+              }
+              setIsGettingLocation(false);
+            })
+            .catch((err) => {
+              // Fallback to coordinates if geocoding fails
+              console.warn('Geocoding failed, using coordinates:', err.message || err);
+              setDestination(`Near your location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+              setIsGettingLocation(false);
+            });
+        },
+        (error) => {
+          // Handle geolocation errors with specific messages
+          let errorMessage = 'Unable to get your location. ';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += 'Please allow location access in your browser settings.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += 'Location information is unavailable.';
+              break;
+            case error.TIMEOUT:
+              errorMessage += 'The request to get your location timed out.';
+              break;
+            default:
+              errorMessage += 'An unknown error occurred.';
+          }
+          
+          console.error('Geolocation error:', errorMessage);
+          alert(errorMessage);
+          setIsGettingLocation(false);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser.');
+      setIsGettingLocation(false);
+    }
+  };
+
+  // 2. The proper handleSearch function with the 4-second loading timer
+  const handleSearch = () => {
+    setIsLoading(true); // Show loading screen
+
+    setTimeout(() => {
+      // Navigate to search results with query parameters
+      const params = new URLSearchParams();
+      if (destination) params.set('destination', destination);
+      if (checkIn) params.set('checkIn', checkIn.toISOString());
+      if (checkOut) params.set('checkOut', checkOut.toISOString());
+      params.set('rooms', rooms.toString());
+      params.set('guests', guests.toString());
+      
+      navigate(`/search?${params.toString()}`);
+      setIsLoading(false); // Hide loading screen
+    }, 4000); // 4 second delay
+  };
+
+  const formatDateRange = () => {
+    if (checkIn && checkOut) {
+      return `${format(checkIn, 'EEE, dd MMM')} — ${format(checkOut, 'EEE, dd MMM')}`;
+    }
+    return 'Fri, 13 Mar — Sat, 14 Mar';
+  };
+
+  return (
+    <>
+      {/* 3. Added the LoadingScreen so it actually appears when isLoading is true */}
+      {isLoading && <LoadingScreen />}
+      
+      <section className="relative" style={{ backgroundColor: '#EE2A24' }}>
+        {/* Hero Content */}
+        <div className="max-w-7xl mx-auto px-6 py-32">
+          {/* Headline */}
+          <h2 className="text-white text-center text-4xl font-bold mb-16 max-w-4xl mx-auto leading-tight">
+            World's fastest-growing hotel chain. Over 100,000 hotels across 35 countries.
+          </h2>
+
+          {/* Unified Search Bar */}
+          <div className="max-w-5xl mx-auto bg-white shadow-2xl flex items-center" style={{ height: '64px', borderRadius: '4px', overflow: 'hidden' }}>
+            
+            {/* Section 1: Location - 40% */}
+            <div className="flex items-center justify-between px-4 border-r border-gray-200" style={{ width: '40%', height: '100%' }}>
+              <input
+                type="text"
+                placeholder="Search for a Hotel, City or Area"
+                className="flex-1 outline-none text-sm"
+                style={{ color: '#222222' }}
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+              />
+              <button 
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full ml-3 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#F3F4F6', border: '1px solid #E5E7EB' }}
+                onClick={handleNearbyLocation}
+                disabled={isGettingLocation}
+              >
+                <Crosshair className={`w-3.5 h-3.5 ${isGettingLocation ? 'animate-spin' : ''}`} style={{ color: '#4B5563' }} />
+                <span className="text-xs font-medium" style={{ color: '#222222' }}>
+                  {isGettingLocation ? 'locating...' : 'nearby'}
+                </span>
+              </button>
+            </div>
+
+            {/* Section 2: Dates - 25% */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex items-center px-4 border-r border-gray-200 text-left hover:bg-gray-50 transition-colors" style={{ width: '25%', height: '100%' }}>
+                  <span className="text-sm" style={{ color: '#222222' }}>
+                    {formatDateRange()}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <div className="flex gap-4 p-4">
+                  <div>
+                    <p className="text-sm font-semibold mb-2" style={{ color: '#222222' }}>Check-in</p>
+                    <CalendarComponent
+                      mode="single"
+                      selected={checkIn}
+                      onSelect={setCheckIn}
+                      initialFocus
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold mb-2" style={{ color: '#222222' }}>Check-out</p>
+                    <CalendarComponent
+                      mode="single"
+                      selected={checkOut}
+                      onSelect={setCheckOut}
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Section 3: Guests - 20% */}
+            <div className="flex items-center px-4" style={{ width: '20%', height: '100%' }}>
+              <GuestSelector 
+                rooms={rooms} 
+                guests={guests} 
+                onUpdate={(newRooms, newGuests) => {
+                  setRooms(newRooms);
+                  setGuests(newGuests);
+                }}
+                compact={true}
+              />
+            </div>
+
+            {/* Section 4: Search Button - 15% */}
+            <button
+              onClick={handleSearch}
+              className="flex items-center justify-center font-bold text-white hover:opacity-90 transition-opacity"
+              style={{ width: '15%', height: '100%', backgroundColor: '#08CB00' }}
+            >
+              Search 
+            </button>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}

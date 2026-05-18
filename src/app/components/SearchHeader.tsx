@@ -1,0 +1,209 @@
+import { Search, MapPin, Calendar, Users, Plus, Minus } from 'lucide-react';
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { Calendar as CalendarComponent } from './ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { useNavigate } from 'react-router';
+import LoadingScreen from './LoadingScreen'; // Make sure this path is correct!
+
+interface SearchHeaderProps {
+  initialDestination?: string;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+  initialRooms?: string;
+  initialGuests?: string;
+}
+
+export function SearchHeader({
+  initialDestination = '',
+  initialCheckIn,
+  initialCheckOut,
+  initialRooms = '1',
+  initialGuests = '2'
+}: SearchHeaderProps) {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false); // Added loading state
+  
+  const [destination, setDestination] = useState(initialDestination);
+  const [checkIn, setCheckIn] = useState<Date | undefined>(
+    initialCheckIn ? new Date(initialCheckIn) : undefined
+  );
+  const [checkOut, setCheckOut] = useState<Date | undefined>(
+    initialCheckOut ? new Date(initialCheckOut) : undefined
+  );
+  const [rooms, setRooms] = useState(parseInt(initialRooms));
+  const [guests, setGuests] = useState(parseInt(initialGuests));
+
+  const handleSearch = () => {
+    // 1. Show the loading screen immediately
+    setIsLoading(true);
+
+    // 2. Start the 4-second timer
+    setTimeout(() => {
+      // 3. Build your URL params just like before
+      const params = new URLSearchParams();
+      if (destination) params.set('destination', destination);
+      if (checkIn) params.set('checkIn', checkIn.toISOString());
+      if (checkOut) params.set('checkOut', checkOut.toISOString());
+      params.set('rooms', rooms.toString());
+      params.set('guests', guests.toString());
+      
+      // 4. Navigate to the search results page
+      navigate(`/search?${params.toString()}`);
+      
+      // 5. Turn off loading state
+      setIsLoading(false);
+    }, 4000);
+  };
+
+  const updateRooms = (delta: number) => {
+    const newRooms = Math.max(1, Math.min(10, rooms + delta));
+    setRooms(newRooms);
+  };
+
+  const updateGuests = (delta: number) => {
+    const newGuests = Math.max(1, Math.min(20, guests + delta));
+    setGuests(newGuests);
+  };
+
+  return (
+    <>
+      {/* Render the Loading Screen if isLoading is true */}
+      {isLoading && <LoadingScreen />}
+
+      <div className="bg-white border-b border-gray-200 py-4 sticky top-16 z-40">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center gap-3">
+            {/* Destination */}
+            <div className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md flex-1">
+              <MapPin className="w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="London"
+                className="outline-none text-sm flex-1"
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+              />
+            </div>
+
+            {/* Near me */}
+            <button className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50">
+              Near me
+            </button>
+
+            {/* Check-in */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 min-w-[140px] text-left">
+                  {checkIn ? format(checkIn, 'E, dd MMM') : 'Check-in'}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={checkIn}
+                  onSelect={setCheckIn}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            <span className="text-gray-400">-</span>
+
+            {/* Check-out */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 min-w-[140px] text-left">
+                  {checkOut ? format(checkOut, 'E, dd MMM') : 'Check-out'}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={checkOut}
+                  onSelect={setCheckOut}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Rooms & Guests */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 min-w-[150px] text-left">
+                  {rooms} Room, {guests} Guests
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="start">
+                <div className="space-y-4">
+                  {/* Rooms */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold" style={{ color: '#222222' }}>Rooms</div>
+                      <div className="text-xs text-gray-500">Max 10 rooms</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => updateRooms(-1)}
+                        disabled={rooms <= 1}
+                        className="w-8 h-8 rounded-full border-2 flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{ borderColor: '#08CB00', color: '#08CB00' }}
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-semibold">{rooms}</span>
+                      <button
+                        onClick={() => updateRooms(1)}
+                        disabled={rooms >= 10}
+                        className="w-8 h-8 rounded-full border-2 flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{ borderColor: '#08CB00', color: '#08CB00' }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Guests */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold" style={{ color: '#222222' }}>Guests</div>
+                      <div className="text-xs text-gray-500">Max 20 guests</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => updateGuests(-1)}
+                        disabled={guests <= 1}
+                        className="w-8 h-8 rounded-full border-2 flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{ borderColor: '#08CB00', color: '#08CB00' }}
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-semibold">{guests}</span>
+                      <button
+                        onClick={() => updateGuests(1)}
+                        disabled={guests >= 20}
+                        className="w-8 h-8 rounded-full border-2 flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{ borderColor: '#08CB00', color: '#08CB00' }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Search Button */}
+            <button
+              onClick={handleSearch}
+              className="px-8 py-2 rounded-md font-semibold hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: '#08CB00', color: '#222222' }}
+            >
+              Search
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
